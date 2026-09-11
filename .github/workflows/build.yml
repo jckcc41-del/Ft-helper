@@ -9,7 +9,7 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Set up JDK 21
-        uses: actions/setup-java@v5
+        uses: actions/setup-java@v4
         with:
           java-version: '21'
           distribution: 'temurin'
@@ -19,14 +19,17 @@ jobs:
         with:
           gradle-version: '8.10'
 
-      - name: Unzip Latest Archive
+      - name: Extract And Build Mod
         run: |
+          # Распаковываем самый свежий zip
           LATEST_ZIP=$(ls -t *.zip | head -n 1)
-          echo "Unzipping $LATEST_ZIP"
-          unzip -o "$LATEST_ZIP" -d .
-
-      - name: Ensure settings.gradle
-        run: |
+          unzip -o "$LATEST_ZIP" -d extracted
+          
+          # Находим, в какой именно папке спрятан код
+          MOD_DIR=$(dirname $(find . -name "build.gradle" | head -n 1))
+          cd "$MOD_DIR"
+          
+          # Добавляем настройки репозиториев
           cat << 'EOF' > settings.gradle
           pluginManagement {
               repositories {
@@ -37,13 +40,13 @@ jobs:
           }
           rootProject.name = 'ft-helper'
           EOF
-
-      - name: Build Mod
-        run: gradle build --no-daemon
+          
+          # Собираем мод
+          gradle build --no-daemon
 
       - name: Upload Artifact
         uses: actions/upload-artifact@v4
         with:
           name: FTHelper-Jar
-          path: build/libs/*.jar
+          path: '**/build/libs/*.jar'
           
