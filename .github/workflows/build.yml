@@ -26,14 +26,17 @@ jobs:
           gradle-version: '8.10'
 
       - name: Make gradlew executable
-        run: chmod +x ./gradlew || true
+        run: |
+          if [ -f ./gradlew ]; then chmod +x ./gradlew; fi
 
       - name: Build Mod
         run: gradle build remapJar --no-daemon --stacktrace
 
       - name: Show outputs
         if: always()
-        run: ls -la build/libs || echo "no build/libs"
+        run: |
+          echo "=== build/libs ==="
+          ls -la build/libs 2>/dev/null || echo "no build/libs"
 
       - name: Upload JAR
         uses: actions/upload-artifact@v6
