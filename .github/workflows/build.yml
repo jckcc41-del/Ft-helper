@@ -1,46 +1,43 @@
-plugins {
-    id 'fabric-loom' version '1.9-SNAPSHOT'
-    id 'maven-publish'
-}
+name: Build Ft-helper
 
-version = '2.0.0-1.21.4'
-group = 'com.ft.helper'
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+  workflow_dispatch:
 
-base {
-    archivesName = 'FTHelper-GUI-FunTime-1.21.4'
-}
+jobs:
+  build:
+    runs-on: ubuntu-latest
 
-repositories {
-    maven { url = 'https://maven.fabricmc.net/' }
-    mavenCentral()
-}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v5
 
-dependencies {
-    minecraft "com.mojang:minecraft:1.21.4"
-    mappings "net.fabricmc:yarn:1.21.4+build.1:v2"
-    modImplementation "net.fabricmc:fabric-loader:0.16.10"     // <-- ДОБАВЛЕНО
-    modImplementation "net.fabricmc.fabric-api:fabric-api:0.114.0+1.21.4"
-}
+      - name: Set up JDK 21
+        uses: actions/setup-java@v5
+        with:
+          java-version: '21'
+          distribution: 'temurin'
 
-loom {
-    // ничего особенного не нужно, но блок полезен для модов
-}
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v5
+        with:
+          gradle-version: '8.10'
 
-processResources {
-    inputs.property "version", project.version
-    filteringCharset "UTF-8"
+      - name: Make gradlew executable
+        run: chmod +x ./gradlew || true
 
-    filesMatching("fabric.mod.json") {
-        expand "version": project.version
-    }
-}
+      - name: Build Mod
+        run: gradle build remapJar --no-daemon --stacktrace
 
-tasks.withType(JavaCompile).configureEach {
-    it.options.release = 21
-}
+      - name: Show outputs
+        if: always()
+        run: ls -la build/libs || echo "no build/libs"
 
-java {
-    withSourcesJar()
-    sourceCompatibility = JavaVersion.VERSION_21
-    targetCompatibility = JavaVersion.VERSION_21
-}
+      - name: Upload JAR
+        uses: actions/upload-artifact@v6
+        with:
+          name: FTHelper-Jar
+          path: build/libs/*.jar
+          if-no-files-found: error
