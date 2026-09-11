@@ -19,8 +19,11 @@ jobs:
         with:
           gradle-version: '8.10'
 
-      - name: Unzip Archive
-        run: unzip -o *.zip -d .
+      - name: Unzip All Archives
+        run: |
+          for f in *.zip; do
+            [ -e "$f" ] && unzip -o "$f" -d .
+          done
 
       - name: Ensure settings.gradle
         run: |
