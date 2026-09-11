@@ -9,7 +9,7 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Set up JDK 21
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@v5
         with:
           java-version: '21'
           distribution: 'temurin'
@@ -19,11 +19,11 @@ jobs:
         with:
           gradle-version: '8.10'
 
-      - name: Unzip All Archives
+      - name: Unzip Latest Archive
         run: |
-          for f in *.zip; do
-            [ -e "$f" ] && unzip -o "$f" -d .
-          done
+          LATEST_ZIP=$(ls -t *.zip | head -n 1)
+          echo "Unzipping $LATEST_ZIP"
+          unzip -o "$LATEST_ZIP" -d .
 
       - name: Ensure settings.gradle
         run: |
