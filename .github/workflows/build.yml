@@ -38,7 +38,7 @@ jobs:
 
           cat << 'EOF' > build.gradle
           plugins {
-              id 'fabric-loom' version '1.9'
+              id 'fabric-loom' version '1.9-SNAPSHOT'
               id 'maven-publish'
           }
 
@@ -358,7 +358,7 @@ jobs:
           EOF
 
       - name: Build Mod
-        run: gradle build --no-daemon
+        run: gradle build --stacktrace --no-daemon
 
       - name: Upload Artifact
         uses: actions/upload-artifact@v4
