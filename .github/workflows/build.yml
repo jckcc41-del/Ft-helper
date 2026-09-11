@@ -25,33 +25,52 @@ jobs:
         with:
           gradle-version: '8.10'
 
+      - name: Diagnose archive
+        run: |
+          echo "=== Repo root ==="
+          ls -la
+          echo "=== ZIP files ==="
+          ls -la *.zip || echo "NO ZIP FOUND"
+
       - name: Unzip Latest Archive
         run: |
-          LATEST_ZIP=$(ls -t *.zip | head -n 1)
-          echo "Unzipping $LATEST_ZIP"
-          unzip -o "$LATEST_ZIP" -d .
-
-      - name: Show project structure
-        run: |
-          echo "=== Top level ==="
-          ls -la
-          echo "=== Looking for build.gradle ==="
-          find . -maxdepth 3 -name "build.gradle" -o -maxdepth 3 -name "build.gradle.kts"
-
-      - name: Move into project dir if needed
-        run: |
-          if [ ! -f ./build.gradle ] && [ ! -f ./build.gradle.kts ]; then
-            PROJECT_DIR=$(find . -maxdepth 2 -name "build.gradle" -o -maxdepth 2 -name "build.gradle.kts" | head -n 1 | xargs dirname)
-            echo "Project found in: $PROJECT_DIR"
-            shopt -s dotglob
-            mv "$PROJECT_DIR"/* . 2>/dev/null || true
-            rmdir "$PROJECT_DIR" 2>/dev/null || true
+          LATEST_ZIP=$(ls -t *.zip 2>/dev/null | head -n 1)
+          if [ -z "$LATEST_ZIP" ]; then
+            echo "::error::No .zip file in repository root"
+            exit 1
           fi
-          ls -la
+          echo "Unzipping $LATEST_ZIP"
+          unzip -o "$LATEST_ZIP" -d extracted
+          echo "=== Extracted tree ==="
+          find extracted -maxdepth 3 -type f | head -n 60
+
+      - name: Find project root
+        id: findroot
+        run: |
+          if [ -f extracted/build.gradle ] || [ -f extracted/build.gradle.kts ]; then
+            echo "dir=extracted" >> $GITHUB_OUTPUT
+          elif [ -f extracted/*/build.gradle ] || [ -f extracted/*/build.gradle.kts ]; then
+            SUB=$(ls -d extracted/*/ | head -n 1)
+            echo "dir=$SUB" >> $GITHUB_OUTPUT
+          else
+            echo "::error::build.gradle not found in archive"
+            find extracted -type f | head -n 60
+            exit 1
+          fi
+
+      - name: Show project layout
+        run: |
+          echo "Project dir: ${{ steps.findroot.outputs.dir }}"
+          ls -la "${{ steps.findroot.outputs.dir }}"
+          echo "=== gradle.properties ==="
+          cat "${{ steps.findroot.outputs.dir }}/gradle.properties" || true
+          echo "=== settings.gradle(.kts) ==="
+          cat "${{ steps.findroot.outputs.dir }}/settings.gradle" 2>/dev/null || cat "${{ steps.findroot.outputs.dir }}/settings.gradle.kts" 2>/dev/null || echo "no settings file"
 
       - name: Ensure settings.gradle
+        working-directory: ${{ steps.findroot.outputs.dir }}
         run: |
-          if [ ! -f ./settings.gradle ] && [ ! -f ./settings.gradle.kts ]; then
+          if [ ! -f settings.gradle ] && [ ! -f settings.gradle.kts ]; then
             cat << 'EOF' > settings.gradle
           pluginManagement {
               repositories {
@@ -65,23 +84,46 @@ jobs:
           fi
 
       - name: Make gradlew executable
+        working-directory: ${{ steps.findroot.outputs.dir }}
         run: |
           if [ -f ./gradlew ]; then chmod +x ./gradlew; fi
 
-      - name: Build Mod
-        run: gradle build remapJar --no-daemon --stacktrace
+      - name: Build Mod (capture log)
+        id: build
+        working-directory: ${{ steps.findroot.outputs.dir }}
+        continue-on-error: true
+        run: |
+          set -o pipefail
+          gradle build remapJar --no-daemon --stacktrace --info 2>&1 | tee ../build.log
+          echo "EXIT=${PIPESTATUS[0]}" >> $GITHUB_OUTPUT
 
-      - name: Show build outputs
+      - name: Build outputs
         if: always()
+        working-directory: ${{ steps.findroot.outputs.dir }}
         run: |
           echo "=== build/ tree ==="
-          find build -type f 2>/dev/null | head -n 50 || echo "no build dir"
-          echo "=== libs ==="
-          ls -la build/libs/ 2>/dev/null || echo "no build/libs"
+          find build -type f 2>/dev/null | head -n 80 || echo "no build dir"
+          echo "=== build/libs ==="
+          ls -la build/libs 2>/dev/null || echo "no build/libs"
 
-      - name: Upload Artifact
+      - name: Upload build log
+        if: always()
+        uses: actions/upload-artifact@v6
+        with:
+          name: build-log
+          path: build.log
+          if-no-files-found: warn
+
+      - name: Upload JARs (if any)
+        if: always()
         uses: actions/upload-artifact@v6
         with:
           name: FTHelper-Jar
-          path: build/libs/*.jar
-          if-no-files-found: error
+          path: ${{ steps.findroot.outputs.dir }}/build/libs/*.jar
+          if-no-files-found: warn
+
+      - name: Fail if build failed
+        if: steps.build.outputs.EXIT != '0'
+        run: |
+          echo "::error::Gradle failed with exit code ${{ steps.build.outputs.EXIT }} — скачай артефакт 'build-log' и пришли мне"
+          exit 1
