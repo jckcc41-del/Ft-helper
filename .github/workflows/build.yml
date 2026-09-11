@@ -31,9 +31,28 @@ jobs:
           echo "Unzipping $LATEST_ZIP"
           unzip -o "$LATEST_ZIP" -d .
 
+      - name: Show project structure
+        run: |
+          echo "=== Top level ==="
+          ls -la
+          echo "=== Looking for build.gradle ==="
+          find . -maxdepth 3 -name "build.gradle" -o -maxdepth 3 -name "build.gradle.kts"
+
+      - name: Move into project dir if needed
+        run: |
+          if [ ! -f ./build.gradle ] && [ ! -f ./build.gradle.kts ]; then
+            PROJECT_DIR=$(find . -maxdepth 2 -name "build.gradle" -o -maxdepth 2 -name "build.gradle.kts" | head -n 1 | xargs dirname)
+            echo "Project found in: $PROJECT_DIR"
+            shopt -s dotglob
+            mv "$PROJECT_DIR"/* . 2>/dev/null || true
+            rmdir "$PROJECT_DIR" 2>/dev/null || true
+          fi
+          ls -la
+
       - name: Ensure settings.gradle
         run: |
-          cat << 'EOF' > settings.gradle
+          if [ ! -f ./settings.gradle ] && [ ! -f ./settings.gradle.kts ]; then
+            cat << 'EOF' > settings.gradle
           pluginManagement {
               repositories {
                   maven { url = 'https://maven.fabricmc.net/' }
@@ -43,13 +62,22 @@ jobs:
           }
           rootProject.name = 'ft-helper'
           EOF
+          fi
 
       - name: Make gradlew executable
         run: |
           if [ -f ./gradlew ]; then chmod +x ./gradlew; fi
 
       - name: Build Mod
-        run: gradle build --no-daemon
+        run: gradle build remapJar --no-daemon --stacktrace
+
+      - name: Show build outputs
+        if: always()
+        run: |
+          echo "=== build/ tree ==="
+          find build -type f 2>/dev/null | head -n 50 || echo "no build dir"
+          echo "=== libs ==="
+          ls -la build/libs/ 2>/dev/null || echo "no build/libs"
 
       - name: Upload Artifact
         uses: actions/upload-artifact@v6
