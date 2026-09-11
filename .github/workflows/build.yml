@@ -22,11 +22,18 @@ jobs:
       - name: Unzip Archive
         run: unzip -o *.zip -d .
 
-      - name: Fix Repositories and Settings
+      - name: Ensure settings.gradle
         run: |
-          echo "pluginManagement { repositories { maven { url = 'https://maven.fabricmc.net/' }; mavenCentral(); gradlePluginPortal() } }" > settings.gradle
-          echo "rootProject.name = 'ft-helper'" >> settings.gradle
-          echo "repositories { maven { url = 'https://maven.fabricmc.net/' } }" >> build.gradle
+          cat << 'EOF' > settings.gradle
+          pluginManagement {
+              repositories {
+                  maven { url = 'https://maven.fabricmc.net/' }
+                  mavenCentral()
+                  gradlePluginPortal()
+              }
+          }
+          rootProject.name = 'ft-helper'
+          EOF
 
       - name: Build Mod
         run: gradle build --no-daemon
