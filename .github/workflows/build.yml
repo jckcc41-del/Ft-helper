@@ -57,6 +57,7 @@ jobs:
           dependencies {
               minecraft "com.mojang:minecraft:1.21.4"
               mappings "net.fabricmc:yarn:1.21.4+build.1:v2"
+              modImplementation "net.fabricmc:fabric-loader:0.16.10"
               modImplementation "net.fabricmc.fabric-api:fabric-api:0.114.0+1.21.4"
           }
 
@@ -358,7 +359,7 @@ jobs:
           EOF
 
       - name: Build Mod
-        run: gradle build --stacktrace --no-daemon
+        run: gradle build --no-daemon
 
       - name: Upload Artifact
         uses: actions/upload-artifact@v4
